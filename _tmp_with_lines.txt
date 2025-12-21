@@ -1,0 +1,684 @@
+   1: using System.Collections;
+   2: using UnityEngine;
+   3: 
+   4: /// <summary>
+   5: /// Basit düşman AI'sı: idle/run/attack animasyonları ve dikdörtgen görme alanı.
+   6: /// </summary>
+   7: public class EnemyController : MonoBehaviour
+   9:     [Header("Referanslar")]
+  10:     [SerializeField] private Transform player;
+  11:     [SerializeField] private string playerTag = "Player";
+  12:     [SerializeField] private Animator animator;
+  13:     [SerializeField] private Rigidbody2D rb;
+  14:     [SerializeField] private SpriteRenderer spriteRenderer;
+  15: 
+  16:     [Header("Carpisma")]
+  17:     [Tooltip("Ana beden collider'i (player ile beden carpismasini ignore etmek icin).")]
+  18:     [SerializeField] private Collider2D bodyCollider;
+  19:     [SerializeField] private bool ignorePlayerBodyCollision = false;
+  20:     [SerializeField] private bool useKinematicForBlocking = true;
+  21:     [Tooltip("Player ile surtunmeden dogan itme/sliding'i engellemek icin temas aninda x hizlarini sifirlar.")]
+  22:     [SerializeField] private bool dampenPlayerPush = true;
+  23: 
+  24:     [Header("Hareket")]
+  25:     public float moveSpeed = 2.5f;
+  26: 
+  27:     [Header("Detection Area")]
+  28:     public Vector2 detectionBoxSize = new Vector2(6f, 3f);
+  29:     public Vector2 detectionBoxOffset = new Vector2(3f, 0f);
+  30:     public LayerMask playerLayer;
+  31: 
+  32:     [Header("SaldZ�rZ�")]
+  33:     public float attackCooldown = 1.0f;
+  34:     [SerializeField] private bool useAnimationEventsForHitbox = true;
+  35:     [SerializeField] private float attackAnimationDuration = 0.5f;
+  36:     [SerializeField] private Collider2D attackTrigger;
+  37:     [SerializeField] private int playerDamage = 1;
+  38:     [SerializeField] private Collider2D attackHitbox;
+  39:     [SerializeField] private float hitboxEnableDelay = 0.15f;
+  40:     [SerializeField] private float hitboxActiveDuration = 0.25f;
+  41:     public string idleBool = "Idle";
+  42:     public string runBool = "Run";
+  43:     public string attackBool = "IsAttacking";
+  44:     [SerializeField] private string attackClipName = "Attack";
+  45:     public bool flipSprite = true;
+  46:     [SerializeField] private bool lockFacingWhileAttacking = true;
+  47:     [SerializeField] private float flipDeadZone = 0.2f;
+  48: 
+  49:     [Header("Hasar")]
+  50:     [SerializeField] private Collider2D playerAttackCollider;
+  51:     [SerializeField] private string playerAttackTag = "PlayerAttack";
+  52:     [SerializeField] private int maxHealth = 3;
+  53:     [SerializeField] private float knockbackForce = 6f;
+  54:     [SerializeField] private float knockbackVerticalBoost = 2f;
+  55:     [SerializeField] private bool horizontalOnlyKnockback = true;
+  56:     [SerializeField] private float knockbackDuration = 0.2f;
+  57:     [SerializeField] private float hitFlashDuration = 0.12f;
+  58:     [SerializeField] private Color hitFlashColor = Color.red;
+  59:     [SerializeField] private float damageCooldown = 0.1f;
+  60:     private RigidbodyType2D initialBodyType;
+  61:     private float initialGravityScale;
+  62:     private bool initialUseFullKinematicContacts;
+  63:     private bool bodyStateCaptured;
+  64: 
+  65:     private bool isAttacking;
+  66:     private bool canAttack = true;
+  67:     private bool facingRight = true;
+  68:     private int currentHealth;
+  69:     private bool isDead;
+  70:     private Coroutine flashRoutine;
+  71:     private Coroutine knockbackRoutine;
+  72:     private float lastDamageTime = float.NegativeInfinity;
+  73:     private readonly Collider2D[] attackTriggerHits = new Collider2D[2];
+  74:     private ContactFilter2D attackContactFilter;
+  75:     private bool attackFilterReady;
+  76:     private bool hitboxActive;
+  77:     private bool hasHitDuringCurrentSwing;
+  78:     private bool shouldMoveTowardsPlayer;
+  79:     private bool isKnockedBack;
+  80:     private readonly System.Collections.Generic.List<Collider2D> playerColliders = new System.Collections.Generic.List<Collider2D>();
+  81: 
+  82:     void Reset()
+  84:         rb = GetComponent<Rigidbody2D>();
+  85:         animator = GetComponentInChildren<Animator>();
+  86:         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+  88: 
+  89:     void Awake()
+  91:         EnsureBodyCollider();
+  92:         CaptureInitialBodyState();
+  93:         ApplyKinematicBlocking();
+  94:         ConfigureAttackContactFilter();
+  95:         TryFindPlayerByTag();
+  96:         EnemyTracker.Instance.RegisterEnemy(this);
+  97:         RefreshPlayerColliders();
+  98:         IgnoreAllPlayerBodyCollisions();
+ 100: 
+ 101:     void OnValidate()
+ 103:         EnsureBodyCollider();
+ 104:         maxHealth = Mathf.Max(1, maxHealth);
+ 105:         playerDamage = Mathf.Max(1, playerDamage);
+ 106:         damageCooldown = Mathf.Max(0f, damageCooldown);
+ 107:         hitboxEnableDelay = Mathf.Max(0f, hitboxEnableDelay);
+ 108:         hitboxActiveDuration = Mathf.Max(0f, hitboxActiveDuration);
+ 109:         flipDeadZone = Mathf.Max(0f, flipDeadZone);
+ 110:         ConfigureAttackContactFilter();
+ 112: 
+ 113:     void OnEnable()
+ 115:         TryFindPlayerByTag();
+ 116:         ResetHealth();
+ 118: 
+ 119:     void OnDisable()
+ 121:         if (EnemyTracker.Instance != null)
+ 122:             EnemyTracker.Instance.UnregisterEnemy(this);
+ 124: 
+ 125:     private void ResetHealth()
+ 127:         currentHealth = Mathf.Max(1, maxHealth);
+ 128:         isDead = false;
+ 129:         flashRoutine = null;
+ 130:         lastDamageTime = float.NegativeInfinity;
+ 131:         hasHitDuringCurrentSwing = false;
+ 132:         SetAttackHitboxActive(false);
+ 133:         isKnockedBack = false;
+ 135:         if (rb != null) rb.linearVelocity = Vector2.zero;
+ 136:         RestoreBodyState();
+ 138: 
+ 139:     void Update()
+ 141:         if (player == null)
+ 142:             TryFindPlayerByTag();
+ 143: 
+ 144:         if (player == null || isDead)
+ 145:             return;
+ 146: 
+ 147:         if (transform.position.y <= fallDeathY)
+ 149:             Die();
+ 150:             return;
+ 152: 
+ 153:         bool playerInSight = CheckPlayerInDetectionBox();
+ 154:         float deltaX = player.position.x - transform.position.x;
+ 155:         float fullDistance = Vector2.Distance(transform.position, player.position);
+ 156: 
+ 157:         if (!playerInSight || fullDistance > detectionBoxSize.x * 1.5f)
+ 159:             if (!isAttacking)
+ 160:                 SetState(idle: true, run: false);
+ 161:             shouldMoveTowardsPlayer = false;
+ 162:             return;
+ 164: 
+ 165:         OrientTowardsPlayer();
+ 166: 
+ 167:         bool playerInFront = facingRight ? deltaX >= 0f : deltaX <= 0f;
+ 168:         bool playerInAttackZone = CheckPlayerInAttackTrigger();
+ 169: 
+ 170:         if (playerInFront && playerInAttackZone && canAttack)
+ 172:             StartCoroutine(AttackRoutine());
+ 173:             shouldMoveTowardsPlayer = false;
+ 175:         else if (!isAttacking)
+ 177:             shouldMoveTowardsPlayer = true;
+ 179:         else
+ 181:             shouldMoveTowardsPlayer = false;
+ 183: 
+ 184:         if (hitboxActive)
+ 186:             Collider2D dmgCol = GetDamageCollider();
+ 187:             if (dmgCol != null)
+ 188:                 AttemptHitFromHitbox(dmgCol);
+ 191: 
+ 192:     void FixedUpdate()
+ 194:         if (shouldMoveTowardsPlayer && !isAttacking && !isDead && !isKnockedBack && player != null)
+ 195:             MoveTowardsPlayer();
+ 197: 
+ 198:     private bool CheckPlayerInDetectionBox()
+ 200:         Vector2 center = (Vector2)transform.position + GetDetectionOffset();
+ 201:         Collider2D hit = Physics2D.OverlapBox(center, detectionBoxSize, 0f, playerLayer);
+ 202:         return hit != null && hit.transform == player;
+ 204: 
+ 205:     private void MoveTowardsPlayer()
+ 207:         SetState(idle: false, run: true);
+ 208: 
+ 209:         Vector2 direction = new Vector2(player.position.x - transform.position.x, 0f).normalized;
+ 210:         rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
+ 212: 
+ 213:     private IEnumerator AttackRoutine()
+ 215:         isAttacking = true;
+ 216:         canAttack = false;
+ 217:         rb.linearVelocity = Vector2.zero;
+ 218:         SetState(idle: false, run: false);
+ 219: 
+ 220:         if (animator != null)
+ 221:             animator.SetBool(attackBool, true);
+ 222: 
+ 223:         float attackDuration = GetAttackClipDuration();
+ 224: 
+ 225:         if (useAnimationEventsForHitbox)
+ 227:             // Hitbox'i animasyon event'leri acip kapatacak; burada sadece animasyonun bitmesini bekliyoruz.
+ 228:             hasHitDuringCurrentSwing = false;
+ 229:             if (attackDuration > 0f)
+ 230:                 yield return new WaitForSeconds(attackDuration);
+ 232:         else
+ 234:             yield return HandleAttackDamageWindow();
+ 236: 
+ 237:         if (animator != null)
+ 238:             animator.SetBool(attackBool, false);
+ 239: 
+ 240:         isAttacking = false;
+ 241:         SetState(idle: true, run: false);
+ 242: 
+ 243:         if (attackCooldown > 0f)
+ 244:             yield return new WaitForSeconds(attackCooldown);
+ 245: 
+ 246:         canAttack = true;
+ 248: 
+ 249:     private IEnumerator HandleAttackDamageWindow()
+ 251:         Collider2D damageCollider = GetDamageCollider();
+ 252:         if (damageCollider == null)
+ 254:             DealDamageToPlayer(transform.position, requireTriggerCheck: true);
+ 255:             yield break;
+ 257: 
+ 258:         hasHitDuringCurrentSwing = false;
+ 259: 
+ 260:         if (hitboxEnableDelay > 0f)
+ 261:             yield return new WaitForSeconds(hitboxEnableDelay);
+ 262: 
+ 263:         SetAttackHitboxActive(true);
+ 264:         float remaining = hitboxActiveDuration;
+ 265: 
+ 266:         while (remaining > 0f)
+ 268:             AttemptHitFromHitbox(damageCollider);
+ 269:             remaining -= Time.deltaTime;
+ 270:             yield return null;
+ 272: 
+ 273:         SetAttackHitboxActive(false);
+ 274: 
+ 275:         // final check in case overlap happened on last frame
+ 276:         AttemptHitFromHitbox(damageCollider);
+ 278: 
+ 279:     private float GetAttackClipDuration()
+ 281:         if (animator != null)
+ 283:             var ctrl = animator.runtimeAnimatorController;
+ 284:             if (ctrl != null)
+ 286:                 foreach (var clip in ctrl.animationClips)
+ 288:                     if (clip == null)
+ 289:                         continue;
+ 290: 
+ 291:                     if (!string.IsNullOrEmpty(attackClipName) && clip.name == attackClipName)
+ 292:                         return Mathf.Max(0f, clip.length);
+ 296: 
+ 297:         return Mathf.Max(0f, attackAnimationDuration);
+ 299: 
+ 300:     private void SetAttackHitboxActive(bool active)
+ 302:         hitboxActive = active;
+ 303:         if (active)
+ 304:             hasHitDuringCurrentSwing = false;
+ 305: 
+ 306:         // Oncelik: attackHitbox atanmis ise onu ac/kapat, yoksa attackTrigger'i kullan
+ 307:         Collider2D target = attackHitbox != null ? attackHitbox : attackTrigger;
+ 308:         if (target != null)
+ 309:             target.enabled = active;
+ 311: 
+ 312:     // Animasyon event'lerinden cagirmak icin
+ 313:     public void AnimationEvent_EnableHitbox()
+ 315:         SetAttackHitboxActive(true);
+ 317: 
+ 318:     public void AnimationEvent_DisableHitbox()
+ 320:         SetAttackHitboxActive(false);
+ 322: 
+ 323:     private void AttemptHitFromHitbox(Collider2D damageCollider)
+ 325:         if (!hitboxActive || damageCollider == null || hasHitDuringCurrentSwing)
+ 326:             return;
+ 327: 
+ 328:         if (!attackFilterReady)
+ 329:             ConfigureAttackContactFilter();
+ 330: 
+ 331:         int hitCount = damageCollider.Overlap(attackContactFilter, attackTriggerHits);
+ 332:         for (int i = 0; i < hitCount; i++)
+ 334:             Collider2D hit = attackTriggerHits[i];
+ 335:             if (hit == null || hit.transform != player)
+ 336:                 continue;
+ 337: 
+ 338:             if (DealDamageToPlayer(hit.bounds.center, requireTriggerCheck: false))
+ 340:                 hasHitDuringCurrentSwing = true;
+ 341:                 SetAttackHitboxActive(false);
+ 343: 
+ 344:             break;
+ 347: 
+ 348:     private bool DealDamageToPlayer(Vector2 damageOrigin, bool requireTriggerCheck)
+ 350:         if (player == null || isDead)
+ 351:             return false;
+ 352: 
+ 353:         if (requireTriggerCheck && !CheckPlayerInAttackTrigger())
+ 354:             return false;
+ 355: 
+ 356:         Player playerComponent = player.GetComponent<Player>();
+ 357:         if (playerComponent == null)
+ 358:             return false;
+ 359: 
+ 360:         playerComponent.TakeDamage(playerDamage, damageOrigin);
+ 361:         return true;
+ 363: 
+ 364:     private Collider2D GetDamageCollider()
+ 366:         return attackHitbox != null ? attackHitbox : attackTrigger;
+ 368: 
+ 369:     private void TryFindPlayerByTag()
+ 371:         if (player != null || string.IsNullOrEmpty(playerTag))
+ 372:             return;
+ 373: 
+ 374:         GameObject found = GameObject.FindGameObjectWithTag(playerTag);
+ 375:         if (found != null)
+ 376:             player = found.transform;
+ 377: 
+ 378:         RefreshPlayerColliders();
+ 379:         IgnoreAllPlayerBodyCollisions();
+ 381: 
+ 382:     public bool IsDead()
+ 384:         return isDead;
+ 386: 
+ 387:     private void SetState(bool idle, bool run)
+ 389:         if (animator == null)
+ 390:             return;
+ 391: 
+ 392:         animator.SetBool(idleBool, idle);
+ 393:         animator.SetBool(runBool, run);
+ 395: 
+ 396:     private void OrientTowardsPlayer()
+ 398:         if (!flipSprite || spriteRenderer == null || player == null)
+ 399:             return;
+ 400: 
+ 401:         if (lockFacingWhileAttacking && isAttacking)
+ 402:             return;
+ 403: 
+ 404:         float deltaX = player.position.x - transform.position.x;
+ 405:         if (Mathf.Abs(deltaX) <= flipDeadZone)
+ 406:             return;
+ 407: 
+ 408:         facingRight = deltaX >= 0f;
+ 409: 
+ 410:         Vector3 scale = spriteRenderer.transform.localScale;
+ 411:         float magnitude = Mathf.Abs(scale.x);
+ 412:         scale.x = facingRight ? magnitude : -magnitude;
+ 413:         spriteRenderer.transform.localScale = scale;
+ 415: 
+ 416:     void OnDrawGizmosSelected()
+ 418:         Vector3 origin = transform.position;
+ 419:         Vector2 center = (Vector2)origin + GetDetectionOffset();
+ 420: 
+ 421:         Gizmos.color = Color.red;
+ 422:         Gizmos.DrawWireCube(center, detectionBoxSize);
+ 423:         Gizmos.DrawWireSphere(center, 0.05f);
+ 424: 
+ 425:         if (attackTrigger != null)
+ 427:             Gizmos.color = Color.yellow;
+ 428:             DrawColliderGizmo(attackTrigger);
+ 430: 
+ 431:         if (attackHitbox != null)
+ 433:             Gizmos.color = Color.cyan;
+ 434:             DrawColliderGizmo(attackHitbox);
+ 437: 
+ 438:     private void OnTriggerEnter2D(Collider2D other)
+ 440:         IgnoreBodyPush(other);
+ 441:         CancelPlayerPush(other);
+ 442:         HandleDamageCollision(other);
+ 444: 
+ 445:     private void OnCollisionEnter2D(Collision2D collision)
+ 447:         IgnoreBodyPush(collision.collider);
+ 448:         CancelPlayerPush(collision.collider);
+ 449:         HandleDamageCollision(collision.collider);
+ 451: 
+ 452:     private void OnCollisionStay2D(Collision2D collision)
+ 454:         IgnoreBodyPush(collision.collider);
+ 455:         CancelPlayerPush(collision.collider);
+ 457: 
+ 458:     private void OnTriggerStay2D(Collider2D other)
+ 460:         IgnoreBodyPush(other);
+ 461:         CancelPlayerPush(other);
+ 463: 
+ 464:     private Vector2 GetDetectionOffset()
+ 466:         float offsetX = detectionBoxOffset.x;
+ 467: 
+ 468:         if (flipSprite)
+ 470:             offsetX *= facingRight ? 1f : -1f;
+ 472: 
+ 473:         return new Vector2(offsetX, detectionBoxOffset.y);
+ 475: 
+ 476:     private void HandleDamageCollision(Collider2D other)
+ 478:         if (other == null || isDead)
+ 479:             return;
+ 480: 
+ 481:         if (!IsDamageSource(other))
+ 482:             return;
+ 483: 
+ 484:         TryReceiveHit(other.bounds.center);
+ 486: 
+ 487:     private bool IsDamageSource(Collider2D other)
+ 489:         if (playerAttackCollider != null && other == playerAttackCollider)
+ 490:             return true;
+ 491: 
+ 492:         if (!string.IsNullOrEmpty(playerAttackTag) && other.CompareTag(playerAttackTag))
+ 493:             return true;
+ 494: 
+ 495:         return false;
+ 497: 
+ 498:     private void IgnoreBodyPush(Collider2D other)
+ 500:         if (!ignorePlayerBodyCollision || bodyCollider == null || other == null)
+ 501:             return;
+ 502: 
+ 503:         if (string.IsNullOrEmpty(playerTag) || !other.CompareTag(playerTag))
+ 504:             return;
+ 505: 
+ 506:         Physics2D.IgnoreCollision(bodyCollider, other, true);
+ 508: 
+ 509:     private void CancelPlayerPush(Collider2D other)
+ 511:         if (!dampenPlayerPush || other == null || rb == null)
+ 512:             return;
+ 513: 
+ 514:         if (string.IsNullOrEmpty(playerTag) || !other.CompareTag(playerTag))
+ 515:             return;
+ 516: 
+ 517:         // Enemy yatay hizini sifirla
+ 518:         Vector2 v = rb.linearVelocity;
+ 519:         v.x = 0f;
+ 520:         rb.linearVelocity = v;
+ 521: 
+ 522:         // Player yatay hizini da sifirla
+ 523:         Rigidbody2D playerRb = other.attachedRigidbody;
+ 524:         if (playerRb != null)
+ 526:             Vector2 pv = playerRb.linearVelocity;
+ 527:             pv.x = 0f;
+ 528:             playerRb.linearVelocity = pv;
+ 531: 
+ 532:     private void ApplyKinematicBlocking()
+ 534:         if (!useKinematicForBlocking || rb == null)
+ 535:             return;
+ 536: 
+ 537:         rb.bodyType = RigidbodyType2D.Kinematic;
+ 538:         rb.useFullKinematicContacts = true;
+ 539:         rb.freezeRotation = true;
+ 541: 
+ 542:     private void EnsureBodyCollider()
+ 544:         if (bodyCollider != null)
+ 545:             return;
+ 546: 
+ 547:         Collider2D[] cols = GetComponentsInChildren<Collider2D>(includeInactive: true);
+ 548:         for (int i = 0; i < cols.Length; i++)
+ 550:             if (cols[i] != null && !cols[i].isTrigger)
+ 552:                 bodyCollider = cols[i];
+ 553:                 return;
+ 556: 
+ 557:         if (cols.Length > 0)
+ 558:             bodyCollider = cols[0];
+ 560: 
+ 561:     private void RefreshPlayerColliders()
+ 563:         playerColliders.Clear();
+ 564:         if (player == null)
+ 565:             return;
+ 566: 
+ 567:         player.GetComponentsInChildren(true, playerColliders);
+ 569: 
+ 570:     private void IgnoreAllPlayerBodyCollisions()
+ 572:         if (!ignorePlayerBodyCollision || bodyCollider == null)
+ 573:             return;
+ 574: 
+ 575:         if (playerColliders.Count == 0)
+ 576:             RefreshPlayerColliders();
+ 577: 
+ 578:         for (int i = 0; i < playerColliders.Count; i++)
+ 580:             Collider2D col = playerColliders[i];
+ 581:             if (col != null)
+ 582:                 Physics2D.IgnoreCollision(bodyCollider, col, true);
+ 585: 
+ 586:     private void TryReceiveHit(Vector2 sourcePosition)
+ 588:         if (damageCooldown > 0f && Time.time < lastDamageTime + damageCooldown)
+ 589:             return;
+ 590: 
+ 591:         lastDamageTime = Time.time;
+ 592:         ReceiveHit(sourcePosition);
+ 594: 
+ 595:     private void ReceiveHit(Vector2 sourcePosition)
+ 597:         if (isDead)
+ 598:             return;
+ 599: 
+ 600:         currentHealth = Mathf.Max(0, currentHealth - 1);
+ 601:         ApplyKnockback(sourcePosition);
+ 602:         PlayHitFlash();
+ 603: 
+ 604:         if (currentHealth <= 0)
+ 605:             Die();
+ 607:     private void ApplyKnockback(Vector2 sourcePosition)
+ 609:         if (rb == null)
+ 610:             return;
+ 611: 
+ 612:         Vector2 direction = ((Vector2)transform.position - sourcePosition).normalized;
+ 613:         if (direction.sqrMagnitude < 0.0001f)
+ 614:             direction = facingRight ? Vector2.right : Vector2.left;
+ 615: 
+ 616:         float horizontalSign = Mathf.Sign(direction.x);
+ 617:         if (Mathf.Abs(horizontalSign) < 0.01f)
+ 618:             horizontalSign = facingRight ? 1f : -1f;
+ 619: 
+ 620:         float knockY = horizontalOnlyKnockback ? 0f : knockbackVerticalBoost;
+ 621:         Vector2 knockVelocity = new Vector2(horizontalSign * knockbackForce, knockY);
+ 622: 
+ 623:         if (knockbackRoutine != null)
+ 624:             StopCoroutine(knockbackRoutine);
+ 625: 
+ 626:         shouldMoveTowardsPlayer = false;
+ 627:         isKnockedBack = true;
+ 628:         BeginKnockbackBodyState();
+ 629:         knockbackRoutine = StartCoroutine(ForceKnockback(knockVelocity));
+ 631: 
+ 632:     private IEnumerator ForceKnockback(Vector2 velocity)
+ 634:         rb.linearVelocity = velocity;
+ 635:         float remaining = Mathf.Max(0f, knockbackDuration);
+ 636: 
+ 637:         while (remaining > 0f)
+ 639:             rb.linearVelocity = velocity;
+ 640:             remaining -= Time.deltaTime;
+ 641:             yield return null;
+ 643: 
+ 644:         rb.linearVelocity = Vector2.zero;
+ 645:         isKnockedBack = false;
+ 646:         knockbackRoutine = null;
+ 647:         RestoreBodyState();
+ 649: 
+ 650:     private void CaptureInitialBodyState()
+ 652:         if (rb == null || bodyStateCaptured)
+ 653:             return;
+ 654: 
+ 655:         initialBodyType = rb.bodyType;
+ 656:         initialGravityScale = rb.gravityScale;
+ 657:         initialUseFullKinematicContacts = rb.useFullKinematicContacts;
+ 658:         bodyStateCaptured = true;
+ 660: 
+ 661:     private void BeginKnockbackBodyState()
+ 663:         if (rb == null)
+ 664:             return;
+ 665: 
+ 666:         rb.bodyType = RigidbodyType2D.Dynamic;
+ 667:         rb.useFullKinematicContacts = false;
+ 668:         float gravity = initialGravityScale;
+ 669:         if (gravity < 0.1f)
+ 670:             gravity = 1f;
+ 671:         rb.gravityScale = gravity;
+ 672:         rb.freezeRotation = true;
+ 674: 
+ 675:     private void RestoreBodyState()
+ 677:         if (rb == null || !bodyStateCaptured)
+ 678:             return;
+ 679: 
+ 680:         rb.bodyType = initialBodyType;
+ 681:         rb.useFullKinematicContacts = initialUseFullKinematicContacts;
+ 682:         rb.gravityScale = initialGravityScale;
+ 683:         rb.freezeRotation = true;
+ 685: 
+ 686:     private void PlayHitFlash()
+ 688:         if (spriteRenderer == null)
+ 689:             return;
+ 690: 
+ 691:         if (flashRoutine != null)
+ 692:             StopCoroutine(flashRoutine);
+ 693: 
+ 694:         flashRoutine = StartCoroutine(HitFlashRoutine());
+ 696: 
+ 697:     private IEnumerator HitFlashRoutine()
+ 699:         Color originalColor = spriteRenderer.color;
+ 700:         spriteRenderer.color = hitFlashColor;
+ 701:         yield return new WaitForSeconds(hitFlashDuration);
+ 702:         spriteRenderer.color = originalColor;
+ 703:         flashRoutine = null;
+ 705: 
+ 706:     private void Die()
+ 708:         if (isDead)
+ 709:             return;
+ 710: 
+ 711:         isDead = true;
+ 712:         StopAllCoroutines();
+ 713:         flashRoutine = null;
+ 714:         if (rb != null)
+ 715:             rb.linearVelocity = Vector2.zero;
+ 716: 
+ 717:         if (animator != null)
+ 719:             animator.SetBool(attackBool, false);
+ 720:             animator.SetBool(runBool, false);
+ 721:             animator.SetBool(idleBool, false);
+ 723: 
+ 724:         Destroy(gameObject);
+ 725:         if (EnemyTracker.Instance != null)
+ 726:             EnemyTracker.Instance.UnregisterEnemy(this);
+ 728: 
+ 729:     private bool CheckPlayerInAttackTrigger()
+ 731:         if (attackTrigger == null || player == null)
+ 732:             return false;
+ 733: 
+ 734:         if (!attackFilterReady)
+ 735:             ConfigureAttackContactFilter();
+ 736: 
+ 737:         int hitCount = attackTrigger.Overlap(attackContactFilter, attackTriggerHits);
+ 738:         for (int i = 0; i < hitCount; i++)
+ 740:             Collider2D hit = attackTriggerHits[i];
+ 741:             if (hit == null)
+ 742:                 continue;
+ 743: 
+ 744:             if (hit.transform == player)
+ 745:                 return true;
+ 747: 
+ 748:         return false;
+ 750: 
+ 751:     private void ConfigureAttackContactFilter()
+ 753:         attackContactFilter = new ContactFilter2D();
+ 754:         attackContactFilter.useLayerMask = true;
+ 755:         attackContactFilter.layerMask = playerLayer.value == 0 ? Physics2D.AllLayers : playerLayer;
+ 756:         attackContactFilter.useTriggers = true;
+ 757:         attackFilterReady = true;
+ 759: 
+ 760:     private void DrawColliderGizmo(Collider2D collider)
+ 762:         if (collider == null)
+ 763:             return;
+ 764: 
+ 765:         Matrix4x4 previous = Gizmos.matrix;
+ 766:         Gizmos.matrix = collider.transform.localToWorldMatrix;
+ 767: 
+ 768:         switch (collider)
+ 770:             case BoxCollider2D box:
+ 771:                 Gizmos.DrawWireCube(box.offset, box.size);
+ 772:                 break;
+ 773:             case CircleCollider2D circle:
+ 774:                 Gizmos.DrawWireSphere(circle.offset, circle.radius);
+ 775:                 break;
+ 776:             case CapsuleCollider2D capsule:
+ 777:                 Gizmos.DrawWireCube(capsule.offset, capsule.size);
+ 778:                 break;
+ 779:             default:
+ 780:                 Gizmos.matrix = previous;
+ 781:                 Bounds bounds = collider.bounds;
+ 782:                 Gizmos.DrawWireCube(bounds.center, bounds.size);
+ 783:                 Gizmos.matrix = previous;
+ 784:                 return;
+ 786: 
+ 787:         Gizmos.matrix = previous;
+ 789:     [Header("Other")]
+ 790:     [SerializeField] private float fallDeathY = -20f;
+ 792: 
+ 793: 
+ 794: 
+ 795: 
+ 796: 
+ 797: 
+ 798: 
+ 799: 
+ 800: 
+ 801: 
+ 802: 
+ 803: 
+ 804: 
+ 805: 
+ 806: 
+ 807: 
+ 808: 
+ 809: 
+ 810: 
+ 811: 
+ 812: 
+ 813: 
+ 814: 
+ 815: 
+ 816: 
+ 817: 
+ 818: 
+ 819: 
+ 820: 
+ 821: 
+ 822: 
+ 823: 
+ 824: 
+ 825: 
+ 826: 
+ 827: 
+ 828: 
+ 829: 
+ 830: 
+ 831: 
+ 832: 
+ 833: 
+ 834: 
+ 835: 
+ 836: 
+ 837: 
+ 838: 
+ 839: 

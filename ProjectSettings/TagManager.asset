@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 3
+  tags:
+  - Ground
+  - Wall
+  - StickyWall
+  - StickyTrigger
+  - PlayerAttack
+  - Enemy
+  - YouLostUI
+  - 2DGameCamera
+  - Computer
+  - Monitor
+  - Disk
+  - Speaker
+  - Player3D
+  - ProximityCollider
+  - LevelCursor
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - Wall
+  - StickyWall
+  - StickyTrigger
+  - Player
+  - Enemy
+  - 2dGameVolume
+  - IInteractable
+  - Arrow
+  - Spike
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Background
+    uniqueID: 2759723313
+    locked: 0
+  - name: BackGroundObjects
+    uniqueID: 2133921647
+    locked: 0
+  - name: Spike
+    uniqueID: 3742477571
+    locked: 0
+  - name: PlayerLayer
+    uniqueID: 2449588599
+    locked: 0
+  - name: LastScreen
+    uniqueID: 1031097925
+    locked: 0
+  m_RenderingLayers:
+  - Default

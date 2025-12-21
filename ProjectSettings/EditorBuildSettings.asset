@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/3Droom.unity
+    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 2a697b26409bff1439180a6bc90ee8ca
+  - enabled: 1
+    path: Assets/Scenes/Hub.unity
+    guid: 54946516206352a4997c5395b199cdf6
+  - enabled: 1
+    path: Assets/Scenes/Level1.unity
+    guid: 902dac00d70b0e0428260caaef7182ef
+  - enabled: 1
+    path: Assets/Scenes/Level2.unity
+    guid: b6691066bfc497b4c8e38e1360d7e6d3
+  - enabled: 1
+    path: Assets/Scenes/Level3.unity
+    guid: 2861413b2aa57e14fb6d77df00786c7c
+  - enabled: 1
+    path: Assets/Scenes/PrincessRoom.unity
+    guid: b496a654b2e4c604f92126d721156812
+  m_configObjects:
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  m_UseUCBPForAssetBundles: 0
