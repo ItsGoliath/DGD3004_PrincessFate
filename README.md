@@ -30,6 +30,7 @@ Wall Jump: The player can jump from walls to move up.
 Puzzle: At the end of each level, the player must solve a puzzle to continue.
 
 Controls 
+
 W –> Move “Forward”
 A –> Move “Left”
 S –> Move “Backwards”
@@ -41,6 +42,7 @@ Space 2x –> “Double Jump”
 Left Mouse Button –> “Attack” / “interact”
 
 Target Audience & Platform
+
 Princess Fate is made for players “13+” and who enjoy 2D platform games with action and puzzle elements. 
 The game is developed for PC (Windows) and can be played with keyboard and mouse.
 
