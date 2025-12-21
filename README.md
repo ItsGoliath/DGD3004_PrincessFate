@@ -32,13 +32,20 @@ Puzzle: At the end of each level, the player must solve a puzzle to continue.
 Controls 
 
 W –> Move “Forward”
+
 A –> Move “Left”
+
 S –> Move “Backwards”
+
 D –> Move “Right”
+
 E –> “interact”
+
 R –> Restart after death
 Space –> “Jump”
+
 Space 2x –> “Double Jump”
+
 Left Mouse Button –> “Attack” / “interact”
 
 Target Audience & Platform
