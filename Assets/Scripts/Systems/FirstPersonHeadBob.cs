@@ -1,13 +1,13 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 /// <summary>
-/// Head bob + hafif sway/roll: hýzýna göre kamera pivotunu yukarý-aþaðý ve yana oynatýr, küçük roll verir.
+/// Head bob + hafif sway/roll: hÄ±zÄ±na gÃ¶re kamera pivotunu yukarÄ±-aÅŸaÄŸÄ± ve yana oynatÄ±r, kÃ¼Ã§Ã¼k roll verir.
 /// Mini First Person Controller (FirstPersonMovement + Rigidbody) ile uyumlu.
 /// </summary>
 public class FirstPersonHeadBob : MonoBehaviour
 {
-    [SerializeField] private FirstPersonMovement movement; // hýz bilgisi için
-    [SerializeField] private Transform cameraPivot;        // genelde kameranýn parent'ý
+    [SerializeField] private FirstPersonMovement movement; // hÄ±z bilgisi iÃ§in
+    [SerializeField] private Transform cameraPivot;        // genelde kameranÄ±n parent'Ä±
     [SerializeField] private bool enableBob = true;
 
     [Header("Genel")]
@@ -20,9 +20,14 @@ public class FirstPersonHeadBob : MonoBehaviour
     [SerializeField] private float lateralAmplitude = 0.02f;
     [SerializeField] private float rollAngle = 1.5f; // dereceler
 
+    public float BobTimer => bobTimer;
+    public bool IsBobbing => enableBob && currentSpeed > bobSpeedThreshold;
+    public float CurrentSpeed => currentSpeed;
+
     private Vector3 defaultLocalPos;
     private Quaternion defaultLocalRot;
     private float bobTimer;
+    private float currentSpeed;
 
     private void Awake()
     {
@@ -47,22 +52,22 @@ public class FirstPersonHeadBob : MonoBehaviour
                 horizVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         }
 
-        float speed = horizVel.magnitude;
-        if (speed > bobSpeedThreshold)
+        currentSpeed = horizVel.magnitude;
+        if (currentSpeed > bobSpeedThreshold)
         {
-            // hýz ile frekans ölçekle
-            bobTimer += speed * bobFrequency * Time.deltaTime;
+            // hÄ±z ile frekansÄ± Ã¶lÃ§ekle
+            bobTimer += currentSpeed * bobFrequency * Time.deltaTime;
 
-            float bobY = Mathf.Sin(bobTimer * 2f) * verticalAmplitude;   // daha hýzlý yukarý-aþaðý
+            float bobY = Mathf.Sin(bobTimer * 2f) * verticalAmplitude;   // daha hÄ±zlÄ± yukarÄ±-aÅŸaÄŸÄ±
             float bobX = Mathf.Sin(bobTimer) * lateralAmplitude;         // yana sway
-            float roll = Mathf.Sin(bobTimer) * rollAngle;                // küçük roll
+            float roll = Mathf.Sin(bobTimer) * rollAngle;                // kÃ¼Ã§Ã¼k roll
 
             cameraPivot.localPosition = defaultLocalPos + new Vector3(bobX, bobY, 0f);
             cameraPivot.localRotation = defaultLocalRot * Quaternion.Euler(0f, 0f, roll);
         }
         else
         {
-            // yumuþak geri dönüþ
+            // yumuÅŸak geri dÃ¶nÃ¼ÅŸ
             cameraPivot.localPosition = Vector3.Lerp(cameraPivot.localPosition, defaultLocalPos, returnLerp * Time.deltaTime);
             cameraPivot.localRotation = Quaternion.Slerp(cameraPivot.localRotation, defaultLocalRot, returnLerp * Time.deltaTime);
             bobTimer = 0f;

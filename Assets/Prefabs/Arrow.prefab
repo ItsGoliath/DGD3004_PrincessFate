@@ -114,7 +114,7 @@ MonoBehaviour:
   damage: 1
   targetTag: Player
   destroyOnAnyHit: 1
-  lifeTime: 5
+  lifeTime: 6
   flipSpriteWithVelocity: 1
   spriteToFlip: {fileID: 0}
 --- !u!212 &8536835934334778584

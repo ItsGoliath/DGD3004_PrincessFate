@@ -348,6 +348,15 @@ public class ComputerInteractSwitch : MonoBehaviour, IInteractable
     {
         if (mode == LoadSceneMode.Additive)
             cached2DPlayer = FindPlayer();
+
+        // Additive sahne geldiğinde LevelCursor2D sahneye eklenmiş olabilir; 2D moddaysak yeniden aç.
+        if (in2D)
+        {
+            ResolveCursorAndButtons();
+            if (levelCursor2D != null)
+                levelCursor2D.SetCursorActive(true);
+            ToggleLevelCursorButtons(true);
+        }
     }
 
     private void OnSceneUnloaded(Scene scene)
@@ -488,3 +497,4 @@ public class ComputerInteractSwitch : MonoBehaviour, IInteractable
         }
     }
 }
+

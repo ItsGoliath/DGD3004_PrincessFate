@@ -2,7 +2,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Belirlenen waypoint'ler arasında ileri-geri hareket eden basit platform/engel.
+/// Basit ileri-geri hareket eden platform. İstenirse oyuncu üzerine basana kadar bekler.
 /// </summary>
 public class MovingPlatform : MonoBehaviour
 {
@@ -14,6 +14,11 @@ public class MovingPlatform : MonoBehaviour
 
     [Header("Bekleme")]
     [SerializeField] private float waitAtPoint = 0.5f;
+
+    [Header("Aktivasyon")]
+    [Tooltip("Açıkken platform oyuncu üzerine basana kadar hareket etmez.")]
+    [SerializeField] private bool requirePlayerToStart = false;
+    [SerializeField] private string activationTag = "Player";
 
     [Header("Opsiyonel")]
     [Tooltip("Platform konumuna offset eklemek isterseniz kullanın.")]
@@ -31,11 +36,13 @@ public class MovingPlatform : MonoBehaviour
     private Vector3[] waypointPositions;
     private Vector3 previousPosition;
     private readonly HashSet<Transform> passengers = new HashSet<Transform>();
+    private bool activated;
 
     void Awake()
     {
         CacheWaypoints();
         SnapToStart();
+        activated = !requirePlayerToStart;
     }
 
     void OnValidate()
@@ -52,6 +59,9 @@ public class MovingPlatform : MonoBehaviour
             return;
 
         previousPosition = transform.position;
+
+        if (!activated)
+            return;
 
         if (waitTimer > 0f)
         {
@@ -183,12 +193,25 @@ public class MovingPlatform : MonoBehaviour
             passengers.Remove(toRemove[i]);
     }
 
+    private void TryActivate(Collider2D other)
+    {
+        if (!requirePlayerToStart || activated)
+            return;
+
+        if (other != null && other.CompareTag(activationTag))
+        {
+            activated = true;
+            waitTimer = 0f;
+        }
+    }
+
     private void TryAddPassenger(Collider2D other)
     {
         if (other == null || !other.CompareTag(passengerTag))
             return;
 
         passengers.Add(other.transform);
+        TryActivate(other);
     }
 
     private void TryRemovePassenger(Collider2D other)

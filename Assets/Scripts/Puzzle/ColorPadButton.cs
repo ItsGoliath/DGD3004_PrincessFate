@@ -1,20 +1,22 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 /// <summary>
-/// Renkli pad veya buton; bağlı KeypadController (Color mod) ya da ColorPadController'a kimlik gönderir.
-/// Basılınca hafifçe aşağı/ileri kayarak basma hissi verir, doğru girişte basılı kalır; reset durumunda Release çağrısı ile eski haline döner.
-/// Basılıyken tekrar etkileşimi engeller.
+/// Renkli pad veya buton; baÄŸlÄ± KeypadController (Color mod) ya da ColorPadController'a kimlik gÃ¶nderir.
+/// BasÄ±lÄ±nca hafifÃ§e aÅŸaÄŸÄ±/ileri kayarak basma hissi verir, doÄŸru giriÅŸte basÄ±lÄ± kalÄ±r; reset durumunda Release Ã§aÄŸrÄ±sÄ± ile eski haline dÃ¶ner.
+/// BasÄ±lÄ±yken tekrar etkileÅŸimi engeller.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class ColorPadButton : MonoBehaviour, IInteractable
 {
-    [Tooltip("Bu butonun kimliği. Örn: R, G, B, Y.")]
+    [Tooltip("Bu butonun kimliÄŸi. Ã–rn: R, G, B, Y.")]
     [SerializeField] private string colorId = "R";
     [SerializeField] private KeypadController keypadController;
     [SerializeField] private ColorPadController legacyController;
 
-    [Header("Görsel Basma")]
+    [Header("GÃ¶rsel Basma")]
     [SerializeField] private Vector3 pressOffset = new Vector3(-0.06f, 0f, 0f);
+    [Tooltip("BasÄ±ldÄ±ÄŸÄ±nda aÃ§Ä±lacak Ä±ÅŸÄ±k objeleri (child). BoÅŸsa dokunulmaz.")]
+    [SerializeField] private GameObject[] pressLights;
 
     private Vector3 originalLocalPos;
     private bool isPressed;
@@ -27,7 +29,7 @@ public class ColorPadButton : MonoBehaviour, IInteractable
     private void Reset()
     {
         var col = GetComponent<Collider>();
-        col.isTrigger = false; // raycast için fiziksel olsun
+        col.isTrigger = false; // raycast iÃ§in fiziksel olsun
     }
 
     private void OnDisable()
@@ -42,6 +44,7 @@ public class ColorPadButton : MonoBehaviour, IInteractable
 
         isPressed = true;
         transform.localPosition = originalLocalPos + pressOffset;
+        SetPressLights(true);
 
         if (keypadController != null)
         {
@@ -57,10 +60,23 @@ public class ColorPadButton : MonoBehaviour, IInteractable
     {
         transform.localPosition = originalLocalPos;
         isPressed = false;
+        SetPressLights(false);
     }
 
     public bool IsPressed => isPressed;
     public bool HasController => keypadController != null || legacyController != null;
+
+    private void SetPressLights(bool on)
+    {
+        if (pressLights == null)
+            return;
+        for (int i = 0; i < pressLights.Length; i++)
+        {
+            if (pressLights[i] != null)
+                pressLights[i].SetActive(on);
+        }
+    }
+
 
     // IInteractable
     public bool CanInteract(GameObject interactor)
@@ -89,6 +105,10 @@ public class ColorPadButton : MonoBehaviour, IInteractable
 
     public void Highlight(bool on, GameObject interactor)
     {
-        // özel highlight yok
+        // Ã¶zel highlight yok
     }
 }
+
+
+
+

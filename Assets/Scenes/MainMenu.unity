@@ -369,7 +369,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &619394801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -493,6 +493,8 @@ MonoBehaviour:
   cursorPlaneZ: 0
   hideSystemCursor: 1
   manageCursor: 1
+  allowMovement: 0
+  hideVisualWhenInactive: 1
   pointAction: {fileID: 0}
 --- !u!114 &879447734
 MonoBehaviour:

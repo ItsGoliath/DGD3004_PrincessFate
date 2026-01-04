@@ -3704,13 +3704,13 @@ GameObject:
   m_Component:
   - component: {fileID: 619394802}
   - component: {fileID: 619394801}
-  m_Layer: 0
+  m_Layer: 15
   m_Name: Global Light 2D
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &619394801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8857,16 +8857,20 @@ PrefabInstance:
       value: 1.5
       objectReference: {fileID: 0}
     - target: {fileID: 4978446217405914413, guid: 2c5b26ddfe0c4114b959bf2d1341e033, type: 3}
+      propertyPath: requirePlayerToStart
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4978446217405914413, guid: 2c5b26ddfe0c4114b959bf2d1341e033, type: 3}
       propertyPath: 'waypoints.Array.data[0]'
       value: 
-      objectReference: {fileID: 1443555055}
+      objectReference: {fileID: 1495835647}
     - target: {fileID: 4978446217405914413, guid: 2c5b26ddfe0c4114b959bf2d1341e033, type: 3}
       propertyPath: 'waypoints.Array.data[1]'
       value: 
-      objectReference: {fileID: 1495835647}
+      objectReference: {fileID: 1443555055}
     - target: {fileID: 7297076166238463086, guid: 2c5b26ddfe0c4114b959bf2d1341e033, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 11.470001
+      value: -4.159996
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9599,6 +9603,10 @@ PrefabInstance:
     - target: {fileID: 4978446217405914413, guid: 2c5b26ddfe0c4114b959bf2d1341e033, type: 3}
       propertyPath: waitAtPoint
       value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4978446217405914413, guid: 2c5b26ddfe0c4114b959bf2d1341e033, type: 3}
+      propertyPath: requirePlayerToStart
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

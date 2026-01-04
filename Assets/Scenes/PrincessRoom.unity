@@ -1035,13 +1035,13 @@ GameObject:
   m_Component:
   - component: {fileID: 619394802}
   - component: {fileID: 619394801}
-  m_Layer: 0
+  m_Layer: 15
   m_Name: Global Light 2D
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &619394801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2568,10 +2568,12 @@ MonoBehaviour:
   jumpBuffer: 0.1
   extraAirJumps: 1
   wallNormalThreshold: 0.9
-  stickyTriggerTag: StickyTrigger
-  stickyGravityMultiplier: 0.3
-  stickyVerticalSpeed: -2
-  refreshJumpsOnSticky: 1
+  unlockWallJump: 1
+  wallSlideSpeed: 2
+  wallJumpPower: {x: 10, y: 12}
+  jumpCutMultiplier: 0.5
+  wallJumpCooldown: 0.15
+  slideWallTag: StickWall
   groundTag: Ground
   wallTag: Wall
   groundNormalThreshold: 0.55
